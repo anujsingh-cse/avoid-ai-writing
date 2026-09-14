@@ -65,7 +65,7 @@ const AIDetectorValidate = (() => {
           markerMatch &&
           markerMatch[1][0] === open.marker &&
           markerMatch[1].length >= open.len &&
-          /^[ \t]*$/.test(line.slice(markerMatch[1].length));
+          /^[ \t]*\r?$/.test(line.slice(markerMatch[0].length));
         if (isClose) {
           spans.push([open.start, cursor + line.length]);
           open = null;

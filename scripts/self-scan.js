@@ -88,7 +88,7 @@ function fenceSpans(text) {
         markerMatch &&
         markerMatch[1][0] === open.marker &&
         markerMatch[1].length >= open.len &&
-        /^[ \t]*$/.test(line.slice(markerMatch[1].length));
+        /^[ \t]*\r?$/.test(line.slice(markerMatch[0].length));
       if (isClose) {
         spans.push([open.start, cursor + line.length]);
         open = null;
@@ -112,12 +112,13 @@ const QUOTED_SPAN = /(?:"[^"\n]{1,300}"|“[^”\n]{1,300}”|'[^'\n]{2,300}')/g
  */
 function applyExemptions(text) {
   const blank = (s) => s.replace(/[^\n]/g, ' ');
-  let out = text;
+  const chars = text.split('');
   for (const [start, end] of fenceSpans(text)) {
-    const span = text.slice(start, end);
-    out = out.replace(span, blank(span));
+    for (let i = start; i < end; i += 1) {
+      if (chars[i] !== '\n') chars[i] = ' ';
+    }
   }
-  return out
+  return chars.join('')
     .replace(TABLE_BLOCK, blank)
     .replace(BLOCKQUOTE_BLOCK, blank)
     .replace(INLINE_CODE, blank)
