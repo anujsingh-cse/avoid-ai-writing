@@ -64,7 +64,43 @@ const FILES = Object.keys(BUDGETS);
 //
 // Order matters: fenced code first (it can contain anything), then the
 // line-oriented block forms, then inline spans.
-const FENCED_CODE = /^(?:```|~~~)[^\n]*\n[\s\S]*?^(?:```|~~~)[ \t]*$/gm;
+/**
+ * Line scanner over fenced code blocks, mirroring fenceRanges() in
+ * detector/patterns.js. A fence closes only on a line whose marker matches
+ * the opener and is at least as long, so a `~~~` line inside a ``` block (the
+ * normal way to document Markdown fences) is content, not a close. Replaces
+ * the FENCED_CODE regex, which accepted either marker as the closer (#236).
+ */
+function fenceSpans(text) {
+  const spans = [];
+  const lines = text.split('\n');
+  let cursor = 0;
+  let open = null; // { marker, len, start }
+
+  for (const line of lines) {
+    const markerMatch = line.match(/^[ \t]{0,3}(`{3,}|~{3,})/);
+    if (!open) {
+      if (markerMatch) {
+        open = { marker: markerMatch[1][0], len: markerMatch[1].length, start: cursor };
+      }
+    } else {
+      const isClose =
+        markerMatch &&
+        markerMatch[1][0] === open.marker &&
+        markerMatch[1].length >= open.len &&
+        /^[ \t]*$/.test(line.slice(markerMatch[1].length));
+      if (isClose) {
+        spans.push([open.start, cursor + line.length]);
+        open = null;
+      }
+    }
+    cursor += line.length + 1; // +1 for the newline
+  }
+
+  if (open) spans.push([open.start, text.length]);
+  return spans;
+}
+
 const TABLE_BLOCK = /(?:^[ \t]*\|[^\n]*\|[ \t]*(?:\n[ \t]*\|[^\n]*\|[ \t]*)+)/gm;
 const BLOCKQUOTE_BLOCK = /(?:^[ \t]*>[^\n]*(?:\n[ \t]*>[^\n]*)*)/gm;
 const INLINE_CODE = /`[^`\n]+`/g;
@@ -76,8 +112,12 @@ const QUOTED_SPAN = /(?:"[^"\n]{1,300}"|“[^”\n]{1,300}”|'[^'\n]{2,300}')/g
  */
 function applyExemptions(text) {
   const blank = (s) => s.replace(/[^\n]/g, ' ');
-  return text
-    .replace(FENCED_CODE, blank)
+  let out = text;
+  for (const [start, end] of fenceSpans(text)) {
+    const span = text.slice(start, end);
+    out = out.replace(span, blank(span));
+  }
+  return out
     .replace(TABLE_BLOCK, blank)
     .replace(BLOCKQUOTE_BLOCK, blank)
     .replace(INLINE_CODE, blank)
