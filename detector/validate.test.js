@@ -50,6 +50,31 @@ test('fenced code removed → error', () => {
   assert.ok(codes(r).includes('code-block-count'));
 });
 
+test('a tilde line inside a backtick fence does not end it → error', () => {
+  const before = 'Text before.\n\n```md\nexample line one\n~~~\nSECRET CODE A\n```\n\nText after.';
+  const after = 'Text before.\n\n```md\nexample line one\n~~~\nSECRET CODE B\n```\n\nText after.';
+  const r = validate(before, after, { skipResidual: true });
+  assert.ok(codes(r).includes('code-block-modified'), formatResult(r));
+});
+
+test('a backtick line inside a tilde fence does not end it → error', () => {
+  const before = 'Text before.\n\n~~~md\nexample line\n```\nSECRET CODE A\n~~~\n\nAfter.';
+  const after = 'Text before.\n\n~~~md\nexample line\n```\nSECRET CODE B\n~~~\n\nAfter.';
+  const r = validate(before, after, { skipResidual: true });
+  assert.ok(codes(r).includes('code-block-modified'), formatResult(r));
+});
+
+test('a three-backtick line inside a four-backtick fence does not end it → error', () => {
+  // CommonMark: the closing fence must be at least as long as the opener. The
+  // four-backtick outer fence wrapping a three-backtick example is exactly how
+  // fences are documented, and the fence scanner must track the opening run
+  // length so the inner ``` line does not close it (#236 review).
+  const before = 'Text before.\n\n````md\ninner example\n```\nSECRET CODE A\n````\n\nAfter.';
+  const after = 'Text before.\n\n````md\ninner example\n```\nSECRET CODE B\n````\n\nAfter.';
+  const r = validate(before, after, { skipResidual: true });
+  assert.ok(codes(r).includes('code-block-modified'), formatResult(r));
+});
+
 test('blockquote reworded → error', () => {
   const before = 'He said:\n\n> The system is slow and it is getting slower.\n> We need to fix it.\n\nThat is the claim.';
   const after = 'He said:\n\n> The system is slow and getting slower.\n> We need to fix it.\n\nThat is the claim.';
