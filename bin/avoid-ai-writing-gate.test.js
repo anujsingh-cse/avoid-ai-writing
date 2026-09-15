@@ -59,6 +59,15 @@ assert.strictEqual(oversized.status, 2, oversized.stderr);
 assert.match(oversized.stderr, /detector limit exceeded/);
 assert.doesNotMatch(oversized.stdout, /^PASS /m);
 
+// An unsegmented-script document (Chinese/Japanese: no inter-word spaces) is
+// declined, not scored; the gate must exit 2 rather than pass silently (#241).
+const cjk = path.join(tmp, "cjk.md");
+fs.writeFileSync(cjk, "这个函数返回一个承诺，调用方不应假设句柄之后仍可重用。".repeat(50), "utf8");
+const cjkRun = run([cjk]);
+assert.strictEqual(cjkRun.status, 2, cjkRun.stderr);
+assert.match(cjkRun.stderr, /unsegmented-script document/);
+assert.doesNotMatch(cjkRun.stdout, /^PASS /m);
+
 const gitRepo = path.join(tmp, "repo");
 fs.mkdirSync(gitRepo);
 spawnSync("git", ["init", "-q"], { cwd: gitRepo });

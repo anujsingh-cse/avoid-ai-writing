@@ -2695,6 +2695,34 @@ test('reply openers and analytical framing are not reported as acknowledgment lo
   }
 });
 
+test('#241: unsegmented-script documents are declined, not scored "Too short"', () => {
+  // countWords counts \S+ runs; Chinese and Japanese carry no inter-word
+  // spaces, so a long document counted as one word and hit the Too short
+  // gate. Han + kana ranges are detected before the gate; Hangul is
+  // space-separated and segments fine, so it is excluded.
+  const zh = '这个函数返回一个承诺，调用方不应假设句柄之后仍可重用。'.repeat(50);
+  const rzh = AIDetector.analyzeText(zh);
+  assert.equal(rzh.label, 'Unsupported script', `expected Unsupported script, got ${rzh.label}`);
+  assert.equal(rzh.unsupportedScript, true);
+  assert.equal(rzh.document_classification, 'UNSCORED');
+  assert.ok(rzh.stats.cjkChars > 0, 'stats must carry the cjkChars count');
+  assert.match(rzh.stats.reason, /unsegmented-script/);
+
+  const ja = 'この関数はプロミスを返します。呼び出し側は、ハンドルがその後も再利用できると仮定してはいけません。'.repeat(40);
+  assert.equal(AIDetector.analyzeText(ja).label, 'Unsupported script');
+
+  // A genuinely short English document still reports Too short.
+  const en = AIDetector.analyzeText('Short text here.');
+  assert.equal(en.label, 'Too short');
+  assert.equal(en.unsupportedScript, undefined);
+
+  // Korean is space-separated: it segments and scores normally.
+  const ko = '이 함수는 프라미스를 반환합니다. 호출자는 핸들이 나중에 재사용 가능하다고 가정해서는 안 됩니다. '.repeat(30);
+  const rko = AIDetector.analyzeText(ko);
+  assert.notEqual(rko.label, 'Unsupported script');
+  assert.equal(rko.unsupportedScript, undefined);
+});
+
 if (failed > 0) {
   console.error(`\n${failed} test(s) failed`);
   process.exit(1);

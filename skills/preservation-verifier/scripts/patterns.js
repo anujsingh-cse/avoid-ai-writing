@@ -1736,6 +1736,21 @@ const AIDetector = (() => {
 
     const wordCount = countWords(text);
     if (wordCount < 10) {
+      // Chinese and Japanese carry no inter-word spaces, so a long CJK
+      // document counts as one \S+ run and would misreport as "Too short".
+      // Han and kana ranges signal an unsegmented script; Hangul is
+      // space-separated and segments fine, so it is excluded. (GH-241)
+      const cjkChars = (text.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/g) || []).length;
+      if (cjkChars > 0) {
+        return {
+          ...buildV2Defaults('UNSCORED', 'low'),
+          score: 0,
+          label: 'Unsupported script',
+          issues: [],
+          stats: { wordCount, cjkChars, reason: 'unsegmented-script document: no inter-word spaces to count', contextMode, contextModeFallback, sourceMode, sourceModeFallback, maskedFrontmatter, maskedHtmlComments },
+          unsupportedScript: true,
+        };
+      }
       return {
         ...buildV2Defaults('UNSCORED', 'low'),
         score: 0,
